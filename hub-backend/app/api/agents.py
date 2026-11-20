@@ -305,13 +305,23 @@ async def get_my_git(
     """
     from sqlalchemy import select
 
-    from ..models import Repo
-    from ..services import code_creds
+    from ..models import Repo, User
+    from ..services import code_creds, rbac
+    user = await session.get(User, client.user_ref) if client.user_ref else None
+    if user is None:
+        # An unassigned device has no organization to scope repositories by, so it must not fall
+        # back to the whole catalog: git_url may embed access credentials.
+        return {"git": code_creds.api_view(client), "repos": []}
+    # Same rule as repomap._repo_in_scope: a superuser (scope is None) sees everything, a scoped
+    # user sees its own organizations plus unassigned repositories.
+    scope = await rbac.scope_org_ids(session, user)
     repos = (await session.execute(select(Repo))).scalars().all()
+    visible = [repo for repo in repos
+               if scope is None or repo.org_id is None or repo.org_id in scope]
     return {
         "git": code_creds.api_view(client),
         "repos": [{"id": r.id, "name": r.name, "url": r.git_url}
-                  for r in repos if (r.git_url or "").strip()],
+                  for r in visible if (r.git_url or "").strip()],
     }
 
 
