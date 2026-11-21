@@ -307,6 +307,11 @@ async def update_user(
     await _assert_user_in_scope(session, user, target)
     if body.orgId is not None:
         await _assert_org_in_scope(session, user, body.orgId)
+    if target.id == user.id and "roleId" in body.model_fields_set and (
+            body.roleId or None) != (target.role_id or None):
+        # Editing your own role is privilege self-escalation: `user.manage` would be enough to
+        # become a role manager. Another administrator must grant it.
+        raise HTTPException(status_code=400, detail="不能修改自己的角色，请由其他管理员操作")
     if target.is_super and body.isActive is False:
         raise HTTPException(status_code=400, detail="不能停用超级管理员")
     was_active = bool(target.is_active)
