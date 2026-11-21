@@ -596,7 +596,10 @@ async def decide(session: AsyncSession, task: models.Task, actor, *, action: str
     if decision == "reject":
         req.status = "rejected"
         req.resolved_at = _now()
-        if action in ("baseline", "review", "uat"):
+        # UAT rejection is a business verdict over test evidence, not a statement about the code
+        # version. The approve branch already leaves artifact.state alone for UAT; rejection must
+        # not regress a merged/tested version and break deployment for every later environment.
+        if action in ("baseline", "review"):
             artifact.state = "rejected"
         task_events.record(session, task.id, "release.rejected",
                            {"requestId": req.id, "versionId": artifact.id,
