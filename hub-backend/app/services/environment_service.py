@@ -354,13 +354,19 @@ async def save_environment(session: AsyncSession, body: dict, row: am.Environmen
         row.rollback = _rollback(body.get("rollback"), command_required=False)
     if "approvalPolicyId" in body:
         policy_id = _text(body.get("approvalPolicyId"), 36)
-        if policy_id and await session.get(am.ApprovalPolicy, policy_id) is None:
+        policy = await session.get(am.ApprovalPolicy, policy_id) if policy_id else None
+        if policy_id and policy is None:
             raise ValueError("审批策略不存在")
+        if policy and policy.org_id is not None and row.org_id is not None and policy.org_id != row.org_id:
+            raise ValueError("审批策略不属于这个环境的组织")
         row.approval_policy_id = policy_id
     if "acceptancePolicyId" in body:
         policy_id = _text(body.get("acceptancePolicyId"), 36)
-        if policy_id and await session.get(am.ApprovalPolicy, policy_id) is None:
+        policy = await session.get(am.ApprovalPolicy, policy_id) if policy_id else None
+        if policy_id and policy is None:
             raise ValueError("验收职责不存在")
+        if policy and policy.org_id is not None and row.org_id is not None and policy.org_id != row.org_id:
+            raise ValueError("验收职责不属于这个环境的组织")
         row.acceptance_policy_id = policy_id
     if "promotionPolicy" in body or creating:
         row.promotion_policy = promotion_policy(body.get("promotionPolicy"))
