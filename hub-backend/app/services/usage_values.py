@@ -6,6 +6,10 @@ from typing import Any
 
 _QUALITY_RANK = {"unknown": 0, "estimated": 1, "reported": 2, "reconciled": 3}
 
+# A single reported event must not poison the whole account ledger: usage events have no
+# deletion endpoint, so an absurd counter would be permanent.
+_MAX_EVENT_VALUE = 1_000_000_000
+
 
 def _number(value: Any) -> int:
     try:
@@ -23,7 +27,7 @@ def _pick(data: dict, *names: str) -> int:
     for name in names:
         value = data.get(name)
         if isinstance(value, (int, float)) and not isinstance(value, bool) and value >= 0:
-            return _number(value)
+            return min(_number(value), _MAX_EVENT_VALUE)
     return 0
 
 
