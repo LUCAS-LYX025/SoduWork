@@ -339,6 +339,15 @@ async def save_environment(session: AsyncSession, body: dict, row: am.Environmen
                 am.Environment.key == key, am.Environment.org_id == row.org_id,
                 am.Environment.id != row.id)):
             raise ValueError("环境标识已经存在")
+        # requires is stored by key; renaming without rewriting dependents leaves them pointing
+        # at a node that no longer exists and blocks every later release into that environment.
+        dependents = (await session.execute(select(am.Environment).where(
+            am.Environment.id != row.id,
+            (am.Environment.org_id == row.org_id) | am.Environment.org_id.is_(None)
+        ))).scalars().all()
+        for other in dependents:
+            if row.key in (promotion_policy(other.promotion_policy).get("requires") or []):
+                raise ValueError(f"环境标识仍被 {other.name} 的晋升条件引用，先更新依赖再改名")
         row.key = key
     if "name" in body:
         row.name = _text(body.get("name"), 80) or row.name
