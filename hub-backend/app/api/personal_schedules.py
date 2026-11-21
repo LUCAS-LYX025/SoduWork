@@ -247,6 +247,8 @@ async def run_my_schedule(sid: str, body: dict = Body(default_factory=dict),
     from ..services import schedules as sch
     from ..services import schedule_conversations as conversations
     s = await _my_sch(session, sid, client)
+    if not s.enabled:
+        raise HTTPException(status_code=409, detail="该自动化已停用，请先启用")
     instance_id = str(body.get("instanceId") or "").strip()[:80]
     # A same-account device may trigger a schedule, but a local conversation
     # remains pinned to the schedule's original desktop. Only that desktop
