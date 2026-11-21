@@ -242,8 +242,16 @@ async def add_repo(pid: str, body: dict = Body(default_factory=dict),
         local = validate_repo_local_dir(body.get("localDir"))
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    git_url = str(body.get("gitUrl") or "").strip()
+    lowered = git_url.lower()
+    # git_url is handed to the runner's git client; file:// and javascript: would expose local
+    # paths or become a stored-XSS link. Only real code-hosting schemes are meaningful here.
+    if git_url and not (lowered.startswith(("http://", "https://", "ssh://"))
+                        or ("@" in git_url and ":" in git_url)):
+        raise HTTPException(status_code=400,
+                            detail="gitUrl 只能是 http(s)://、ssh:// 或 git@host:path 地址")
     r = Repo(project_id=pid, name=name, kind=kind,
-             git_url=(body.get("gitUrl") or "").strip(),
+             git_url=git_url,
              default_branch=(body.get("branch") or "main").strip() or "main",
              local_dir=local, note=(body.get("note") or "").strip()[:2000],
              # Accept automatic merge and dispatch settings during creation as well as updates.
