@@ -4,6 +4,7 @@
 best-effort standalone behavior. Super administrators see all entries and
 other administrators see actors in their department subtree.
 """
+import logging
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -12,6 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .. import models
 from ..schemas import _ms
 from . import rbac
+
+logger = logging.getLogger(__name__)
 
 
 def add(session: AsyncSession, actor, action: str, target_type: str = "",
@@ -35,6 +38,10 @@ async def log(session: AsyncSession, actor, action: str, target_type: str = "",
         add(session, actor, action, target_type, target_id, target_label, detail)
         await session.commit()
     except Exception:
+        # Best-effort history must never fail the request, but a silent rollback used to look
+        # exactly like a recorded action; surface it so a missing entry stays traceable.
+        logger.exception("audit write failed: action=%s target=%s/%s actor=%s",
+                         action, target_type, target_id, getattr(actor, "id", None))
         await session.rollback()
 
 
