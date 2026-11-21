@@ -4,7 +4,8 @@ function answerHandler(session) {
     const handle = session.get(ref);
     if (!handle) return { ok: false, reason: '会话不在了' };
     if (typeof handle.answerUi !== 'function') return { ok: false, reason: '当前执行底座没有待处理的交互确认' };
-    if (value?.requestId && (!handle.attachedWindow || handle.attachedWindow.webContents?.id !== event.sender.id)) {
+    if (!event?.sender || !handle.attachedWindow?.webContents ||
+        handle.attachedWindow.webContents.id !== event.sender.id) {
       return { ok: false, reason: '请在当前会话窗口确认权限' };
     }
     return (await handle.answerUi(value || {})) || { ok: true };
