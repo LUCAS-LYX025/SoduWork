@@ -127,8 +127,19 @@ function install({ app, ipcMain, session, identityOf, capabilityGrantsOf, _skill
     const dir = workDir(app);
     return { ok: true, dir, name: path.basename(dir) };
   });
+  function _usableWorkDir(dir) {
+    if (typeof dir !== 'string' || !path.isAbsolute(dir)) return false;
+    try {
+      if (!fs.statSync(dir).isDirectory()) return false;
+      // A read-only mount passes isDirectory() but every future session must create files here.
+      fs.accessSync(dir, fs.constants.R_OK | fs.constants.W_OK);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
   function saveWorkdir(dir) {
-    if (typeof dir !== 'string' || !path.isAbsolute(dir) || !fs.statSync(dir).isDirectory()) {
+    if (!_usableWorkDir(dir)) {
       return { ok: false, reason: '所选工作位置不是文件夹' };
     }
     _saveConf({ workDir: dir });
@@ -147,7 +158,7 @@ function install({ app, ipcMain, session, identityOf, capabilityGrantsOf, _skill
     }));
     if (r.canceled || !r.filePaths.length) return { ok: false, canceled: true };
     const dir = r.filePaths[0];
-    if (!fs.statSync(dir).isDirectory()) return { ok: false, reason: '所选工作位置不是文件夹' };
+    if (!_usableWorkDir(dir)) return { ok: false, reason: '所选工作位置不是文件夹' };
     return options?.persist === false ? { ok: true, dir, name: path.basename(dir) } : saveWorkdir(dir);
   });
   ipcMain.handle('pi-session-pick-cwd', async (event, options = {}) => {
