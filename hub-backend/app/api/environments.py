@@ -292,6 +292,10 @@ async def update_approval_policy(
         raise HTTPException(status_code=403, detail="系统审批职责只能由超级管理员调整")
     if scope is not None and row.org_id is not None and row.org_id not in scope:
         raise HTTPException(status_code=403, detail="这项审批职责不在你的组织范围内")
+    if row.is_system:
+        # A built-in policy is a fixed approval contract. Do not answer 200 for a write that
+        # cannot take effect: it leaves the caller believing the release gate was reconfigured.
+        raise HTTPException(status_code=400, detail="系统策略不可修改")
     try:
         row = await policy_svc.save(session, _approval_policy_input(body), row)
     except ValueError as e:
