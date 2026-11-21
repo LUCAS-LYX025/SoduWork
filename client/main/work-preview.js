@@ -824,7 +824,7 @@ function install(deps) {
     try { return composerStep(event, payload); } catch (_) { return { ok: false }; }
   });
   deps.ipcMain.handle('work-preview-composer-state', (event, payload) => {
-    try { return composerState(payload); } catch (_) { return { ok: false }; }
+    try { return composerState(event, payload); } catch (_) { return { ok: false }; }
   });
   deps.ipcMain.handle('work-preview-composer-sent', (event) => {
     try { return composerSent(event); } catch (_) { return { ok: false }; }

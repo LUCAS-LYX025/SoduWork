@@ -717,22 +717,20 @@ function create({ owners: OWNERS, getDeps, ownerFor, ownerSession, safeWebUrl,
     return { ok: false };
   }
 
-  function composerState(payload) {
+  function composerState(event, payload) {
+    const found = composerOwnerBySender(event.sender);
+    if (!found) return { ok: false };
     const tabId = cleanTabId((payload || {}).tabId);
+    if (found.item.id !== tabId || !found.item.composer) return { ok: false };
+    const item = found.item;
     const state = (payload || {}).state || {};
-    for (const owner of OWNERS.values()) {
-      const item = owner.views.get(tabId);
-      if (item && item.composer) {
-        /* Publish conversation changes to composer instances only when the active conversation changes. */
-        const sessionId = String(state.sessionId || '');
-        if (sessionId && sessionId !== item.composer.sessionId) {
-          item.composer.sessionId = sessionId;
-          try { item.composer.view.webContents.send('app-composer-session', { sessionId }); } catch (_) {}
-        }
-        return { ok: true };
-      }
+    /* Publish conversation changes to composer instances only when the active conversation changes. */
+    const sessionId = String(state.sessionId || '');
+    if (sessionId && sessionId !== item.composer.sessionId) {
+      item.composer.sessionId = sessionId;
+      try { item.composer.view.webContents.send('app-composer-session', { sessionId }); } catch (_) {}
     }
-    return { ok: false };
+    return { ok: true };
   }
 
   function composerSent(event) {
