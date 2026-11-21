@@ -467,6 +467,15 @@ async def ensure_request(session: AsyncSession, task: models.Task, artifact: am.
                   ((env.approval_policy_id if action == "deploy" else
                     env.acceptance_policy_id) if env else "") or pid)
     policy = await session.get(am.ApprovalPolicy, pid)
+    if policy is not None and not policy.enabled:
+        # A disabled policy is display-only. Fall back to the action's built-in gate so disabling
+        # an environment/context policy actually takes it out of the dispatch path.
+        default_pid = {"baseline": POLICY_BASELINE, "review": POLICY_REVIEW,
+                       "merge": POLICY_MERGE, "uat": POLICY_UAT,
+                       "deploy": POLICY_PRODUCTION}.get(action, POLICY_REVIEW)
+        if pid != default_pid:
+            pid = default_pid
+            policy = await session.get(am.ApprovalPolicy, default_pid)
     rules = dict((policy.rules if policy else {}) or {})
     # Freeze version, criteria and evidence refs when a gate is created.
     from . import gate_contract
