@@ -446,6 +446,11 @@ async def decide(request_id: str, body: dict = Body(default_factory=dict),
     elif decision == "approve" and request.action == "deploy":
         execution = await deployments.request_environment(
             session, task, request.environment_id, who)
+        if not execution.get("ok"):
+            # The decision is already committed; a failed authorization action must not be
+            # reported as 2xx, otherwise callers treat the deploy as done and never retry it.
+            raise HTTPException(status_code=409,
+                                detail=str(execution.get("error") or "部署授权动作执行失败"))
     elif decision == "approve" and request.action == "uat":
         execution = await deployments.continue_after_acceptance(
             session, task, request.environment_id, who)
