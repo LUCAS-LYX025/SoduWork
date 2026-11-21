@@ -380,6 +380,18 @@ async def delete_environment(session: AsyncSession, row: am.Environment) -> None
         am.DeploymentTarget.environment_id == row.id))
     if used:
         raise ValueError("这个环境还有部署目标，先处理部署目标")
+    approvals = await session.scalar(select(func.count(am.ApprovalRequest.id)).where(
+        am.ApprovalRequest.environment_id == row.id,
+        am.ApprovalRequest.status.in_(("pending", "approved"))))
+    if approvals:
+        raise ValueError("这个环境还有未决审批单，先处理审批单")
+    dependents = (await session.execute(select(am.Environment).where(
+        am.Environment.id != row.id,
+        (am.Environment.org_id == row.org_id) | am.Environment.org_id.is_(None)
+    ))).scalars().all()
+    for other in dependents:
+        if row.key in (promotion_policy(other.promotion_policy).get("requires") or []):
+            raise ValueError(f"{other.name} 的晋升条件仍引用这个环境，先更新依赖再删除")
     await session.delete(row)
     await session.commit()
 
