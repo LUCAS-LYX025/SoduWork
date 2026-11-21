@@ -50,6 +50,12 @@ async def _assert_promotion_graph(session: AsyncSession, row: am.Environment) ->
     graph = {x.key: list(promotion_policy(x.promotion_policy).get("requires") or [])
              for x in rows}
     graph[row.key] = list(promotion_policy(row.promotion_policy).get("requires") or [])
+    # Only validate the row being saved: a dangling reference left behind by a deleted
+    # environment must not block unrelated updates. An unresolved prerequisite can never
+    # be satisfied at runtime, so reject it with the same 409 as a duplicate/cycle.
+    for parent in graph[row.key]:
+        if parent not in graph:
+            raise ValueError(f"晋升前置环境不存在：{parent}")
     if row.key in graph[row.key]:
         raise ValueError("环境不能依赖自己")
     visiting, visited = set(), set()
