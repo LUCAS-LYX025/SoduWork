@@ -268,6 +268,10 @@ async def create_approval_policy(
 ):
     safe = _approval_policy_input(body)
     safe["orgId"] = body.get("orgId") if user.is_super else user.org_id
+    if not user.is_super and not safe["orgId"]:
+        # An org-less admin would create a system policy that only a superuser can later edit or
+        # delete, leaving an unmanageable global object behind.
+        raise HTTPException(status_code=403, detail="请先绑定组织，再创建审批职责")
     try:
         row = await policy_svc.save(session, safe)
     except ValueError as e:
@@ -340,6 +344,10 @@ async def create_environment(
     try:
         safe = dict(body)
         safe["orgId"] = body.get("orgId") if user.is_super else user.org_id
+        if not user.is_super and not safe["orgId"]:
+            # Without an organization this would create a system environment the creator can no
+            # longer modify or delete (both paths require a superuser).
+            raise HTTPException(status_code=403, detail="请先绑定组织，再创建环境")
         if "sort" in safe:
             safe["sort"] = parse_integer(safe["sort"], field="sort", default=0)
         row = await svc.save_environment(session, safe)
